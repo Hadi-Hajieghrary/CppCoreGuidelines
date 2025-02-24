@@ -621,11 +621,39 @@ Now, there is no explicit mention of the iteration mechanism, and the loop opera
 For more details about for-statements, see [ES.71](#Res-for-range).
 Sometimes better still, use a named algorithm. This example uses the `for_each` from the Ranges TS because it directly expresses the intent:
 
-    for_each(v, [](int x) { /* do something with the value of x */ });
-    for_each(par, v, [](int x) { /* do something with the value of x */ });
+    for_each(begin(v), end(v), [](const int x) { /* do something with the value of x */ });
+    for_each(par, begin(v), end(v), [](const int x) { /* do something with the value of x */ });
 
-The last variant makes it clear that we are not interested in the order in which the elements of `v` are handled.
+The elements of `v` are not going to be modified since they are passed to the lambda function by value. For clarity, the input argument of the lambda function is better defined as `const`. Moreover, the last variant suggests the use of parallel execution, which makes it clear that we are not interested in the order in which the elements of `v` are handled. for_each does not return any results. The function should either modify the elements passed (by reference) or use a global variable to store the results - which is not recommended. One solution is to use std::transform instead:
 
+    #include <iostream>
+    #include <iterator>
+    #include <algorithm>
+    #include <vector>
+    
+    template<typename T>
+    void print(std::vector<T> vec){
+        std::copy(std::begin(vec), std::end(vec), std::ostream_iterator<T>(std::cout, ", "));
+    }
+    int main() {
+        std::vector<int> input_vector{1,2,3,4,5,6};
+        std::vector<int> output_vector(6,0);
+        std::transform(std::begin(input_vector), std::end(input_vector), begin(output_vector) , [](const int a){/* Do something and return a result.*/});
+        print(output_vector);
+        return 0;
+    }
+
+    In the code above, `output_vector` must pre-allocate the same size as the input_vector. An even more elegant solution will be the use of `back_inserter`
+
+    int main() {
+        std::vector<int> input_vector{1,2,3,4,5,6};
+        std::vector<int> output_vector;
+        output_vector.reserve(input_vector.size());
+        std::transform(std::begin(input_vector), std::end(input_vector), std::back_inserter(output_vector) , [](const int a){return a+1;});
+        print(output_vector);
+        return 0;
+    }
+    
 A programmer should be familiar with
 
 * [The guidelines support library](#gsl-guidelines-support-library)
@@ -646,7 +674,10 @@ If two `int`s are meant to be the coordinates of a 2D point, say so:
 
     draw_line(int, int, int, int);  // obscure: (x1,y1,x2,y2)? (x,y,h,w)? ...?
                                     // need to look up documentation to know
-
+    struct Point{
+        int x{0};
+        int y{0};
+    };
     draw_line(Point, Point);        // clearer
 
 ##### Enforcement
@@ -661,11 +692,11 @@ Look for common patterns for which there are better alternatives
 
 There is a huge scope for cleverness and semi-automated program transformation.
 
-### <a name="Rp-typesafe"></a>P.4: Ideally, a program should be statically type safe
+### <a name="Rp-typesafe"></a>P.4: Ideally, a program should be statically type-safe
 
 ##### Reason
 
-Ideally, a program would be completely statically (compile-time) type safe.
+Ideally, a program would be completely statically (compile-time) type-safe.
 Unfortunately, that is not possible. Problem areas:
 
 * unions
@@ -804,7 +835,36 @@ We need to pass the pointer and the number of elements as an integral object:
         f4(span<int>{v});          // pass a view, retain ownership
     }
 
-This design carries the number of elements along as an integral part of an object, so that errors are unlikely and dynamic (run-time) checking is always feasible, if not always affordable.
+This design carries the number of elements along as an integral part of an object so that errors are unlikely and dynamic (run-time) checking is always feasible, if not always affordable.
+
+##### Example
+\
+When using `span(v)`, the underlying object `v` should know its size. Therefore, we may not use `span` over a pointer to a dynamically allocated array. In this case, we should specify its size. 
+
+    template<typename T>
+    void print(std::span<T> vec){
+        std::copy(std::begin(vec), std::end(vec), std::ostream_iterator<T>(std::cout, ", "));
+    }
+    int main() {
+        int a[]{1,2,3,4,5,6,7};
+        std::span<int> s(a);
+        print(s);
+    }
+
+This goes against the intuition that when passing a c C-style array to a function it decays to a pointer! The workaround that might be used in to use templates to capture the array size at compile-time
+
+    template<size_t N>
+    size_t size(int (&a)[N]) {
+        return N;
+    }
+    
+    int main() {
+        int a[]{1,2,3,4,5,6,7};
+        std::cout << "Array size: " << size(a) << std::endl;
+    }
+
+However, using a C-style array is nor recommended altogether.
+
 
 ##### Example
 
