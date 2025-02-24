@@ -643,7 +643,7 @@ The elements of `v` are not going to be modified since they are passed to the la
         return 0;
     }
 
-    In the code above, `output_vector` must pre-allocate the same size as the input_vector. An even more elegant solution will be the use of `back_inserter`
+In the code above, `output_vector` must pre-allocate the same size as the input_vector. An even more elegant solution will be the use of `back_inserter`
 
     int main() {
         std::vector<int> input_vector{1,2,3,4,5,6};
